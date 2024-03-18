@@ -1,5 +1,6 @@
 //App.js
 import React, { useState, useEffect } from 'react';
+
 import './App.css';
 
 function App() {
@@ -103,12 +104,12 @@ function App() {
   const onSubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.target);
-
+  
     formData.append("access_key", "0731b65b-61af-4cda-8701-67d08daceaa9");
-
+  
     const object = Object.fromEntries(formData);
     const json = JSON.stringify(object);
-
+  
     const res = await fetch("https://api.web3forms.com/submit", {
       method: "POST",
       headers: {
@@ -117,12 +118,13 @@ function App() {
       },
       body: json
     }).then((res) => res.json());
-
+  
     if (res.success) {
       console.log("Success", res);
       // Establecer el estado para mostrar el mensaje de formulario enviado
+      setFormSubmitted(true); // Cambia el estado a true cuando el formulario se envía con éxito
       event.target.reset();
-      
+
     }
   };
 
@@ -164,6 +166,7 @@ function App() {
           ))}
         </div>
       </section>
+
       <div className="contact-skills-container">
       <section id="contact" className={sections.find(section => section.id === 'contact')?.visible ? 'section-visible' : ''}>
   <h2>Contacto</h2>
