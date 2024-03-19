@@ -1,10 +1,58 @@
 //App.js
 import React, { useState, useEffect } from 'react';
+import { useForm, ValidationError } from '@formspree/react';
 
 import './App.css';
 
+function ContactForm() {
+  const [state, handleSubmit] = useForm("mleqwnpo");
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+
+  useEffect(() => {
+    if (state.succeeded) {
+      setShowSuccessMessage(true);
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 2000); // Desaparece después de 2 segundos
+    }
+  }, [state.succeeded]);
+  
+  return (
+    <div>
+      {showSuccessMessage && <p>¡Gracias por contactar!</p>}
+      <form onSubmit={handleSubmit}>
+        <label htmlFor="email">
+          Email
+        </label>
+        <input
+          id="email"
+          type="email" 
+          name="email"
+        />
+        <ValidationError 
+          prefix="Email" 
+          field="email"
+          errors={state.errors}
+        />
+        <textarea
+          id="message"
+          name="message"
+        />
+        <ValidationError 
+          prefix="Mensaje" 
+          field="message"
+          errors={state.errors}
+        />
+        <button type="submit" disabled={state.submitting}>
+          Enviar
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function App() {
-  const [sections, setSections] = useState([
+  const [sections,setSections] = useState([
     { id: 'about', visible: false },
     { id: 'projects', visible: false },
     { id: 'contact', visible: false },
@@ -13,7 +61,24 @@ function App() {
 
   const [projects, setProjects] = useState([]);
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
-  const [formSubmitted, setFormSubmitted] = useState(false); // Estado para controlar si el formulario ha sido enviado
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const updatedSections = sections.map(section => {
+        const element = document.getElementById(section.id);
+        const rect = element.getBoundingClientRect();
+        const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+        return { ...section, visible: isVisible };
+      });
+      setSections(updatedSections);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [sections]);
 
   useEffect(() => {
     let scrollTimer;
@@ -24,7 +89,7 @@ function App() {
 
       scrollTimer = setTimeout(() => {
         setShowScrollIndicator(false);
-      }, 2000); // 2 segundos
+      }, 7000); // 2 segundos
     };
 
     window.addEventListener('scroll', handleScroll);
@@ -38,93 +103,91 @@ function App() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('https://api.github.com/users/Alvamart2001/repos');
-        const data = await response.json();
-        const projectsWithDetails = await Promise.all(data.map(project => getProjectDetails(project)));
+        // Primero, obtén la lista de repositorios
+        const reposResponse = await fetch(`https://api.github.com/users/Alvamart2001/repos`, {
+          headers: {
+            'Authorization': `token ${process.env.REACT_APP_GITHUB_API_KEY}`
+          }
+        });
+        if (!reposResponse.ok) {
+          throw new Error(`GitHub API responded with status code ${reposResponse.status}`);
+        }
+    
+        const repos = await reposResponse.json();
+        console.log('Repos:', repos); // Log repos
+        
+        // Luego, para cada repositorio, obtén los detalles
+        const projectsWithDetails = await Promise.all(repos.map(async repo => {
+          try {
+            const response = await fetch(`https://api.github.com/repos/Alvamart2001/${repo.name}`, {
+              headers: {
+                'Authorization': `token ${process.env.REACT_APP_GITHUB_API_KEY}`
+              }
+            });
+            const data = await response.json();
+            return {
+              id: repo.id,
+              name: repo.name,
+              description: repo.description,
+              html_url: repo.html_url,
+              homepage: data.homepage,
+              technologies: data.language ? [data.language] : [],
+              image: `https://raw.githubusercontent.com/Alvamart2001/${repo.name}/master/image.png`
+            };
+          } catch (error) {
+            console.error('Error fetching project details:', error);
+            return {
+              id: repo.id,
+              name: repo.name,
+              description: repo.description,
+              html_url: repo.html_url,
+              homepage: '',
+              technologies: [],
+              image: '' // In case of error, image URL will be empty
+            };
+          }
+        }));
+        console.log('ProjectsWithDetails:', projectsWithDetails); // Log projectsWithDetails
         setProjects(projectsWithDetails);
       } catch (error) {
         console.error('Error fetching data from GitHub:', error);
       }
     };
-
+    
     fetchData();
   }, []);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollPosition = window.scrollY;
-  
-      const updatedSections = sections.map(section => {
-        const sectionElement = document.getElementById(section.id);
-        if (sectionElement) {
-          const sectionPosition = sectionElement.offsetTop;
-          return { ...section, visible: scrollPosition >= sectionPosition - window.innerHeight / 2 };
-        }
-        return section;
-      });
-  
-      setSections(updatedSections);
-    };
-  
-    window.addEventListener('scroll', handleScroll);
-    handleScroll();
-  
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-
-  const getProjectDetails = async (repo) => {
-    try {
-      const response = await fetch(`https://api.github.com/repos/Alvamart2001/${repo.name}`);
-      const data = await response.json();
-      return {
-        id: repo.id,
-        name: repo.name,
-        description: repo.description,
-        html_url: repo.html_url,
-        homepage: data.homepage,
-        technologies: data.language ? [data.language] : [],
-        image: `https://raw.githubusercontent.com/Alvamart2001/${repo.name}/master/image.png`
-      };
-    } catch (error) {
-      console.error('Error fetching project details:', error);
-      return {
-        id: repo.id,
-        name: repo.name,
-        description: repo.description,
-        html_url: repo.html_url,
-        homepage: '',
-        technologies: [],
-        image: '' // In case of error, image URL will be empty
-      };
-    }
-  };
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   const onSubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.target);
   
-    formData.append("access_key", "0731b65b-61af-4cda-8701-67d08daceaa9");
+    try {
+      const response = await fetch("https://formspree.io/f/mleqwnpo", {
+        method: "POST",
+        body: formData
+      });
   
-    const object = Object.fromEntries(formData);
-    const json = JSON.stringify(object);
+      if (!response.ok) {
+        throw new Error(`Network response was not ok, status code: ${response.status}`);
+      }
   
-    const res = await fetch("https://api.web3forms.com/submit", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json"
-      },
-      body: json
-    }).then((res) => res.json());
+      const res = await response.json();
+      console.log('Response:', res); // Log response
   
-    if (res.success) {
-      console.log("Success", res);
-      // Establecer el estado para mostrar el mensaje de formulario enviado
-      setFormSubmitted(true); // Cambia el estado a true cuando el formulario se envía con éxito
-      event.target.reset();
-
+      if (res.ok) {
+        console.log("Success", res);
+        // Muestra el mensaje de éxito
+        setShowSuccessMessage(true);
+        // Oculta el mensaje de éxito después de 3 segundos
+        setTimeout(() => {
+          setShowSuccessMessage(false);
+        }, 3000);
+        event.target.reset(); 
+      }
+    } catch (error) {
+      console.error('There has been a problem with your fetch operation:', error);
     }
   };
 
@@ -154,40 +217,24 @@ function App() {
       </section>
 
       <section id="projects" className={sections.find(section => section.id === 'projects')?.visible ? 'section-visible' : ''}>
-        <h2>Proyectos</h2>
-        <div className="projects-list">
-          {projects.map(project => (
-            <div key={project.id} className="project">
-              <h3><a href={project.html_url} target="_blank" rel="noopener noreferrer">{project.name}</a></h3>
-              <p>{project.description}</p>
-              {project.image && <img src={project.image} alt={project.name} />}
-              <p>Tecnologías utilizadas: {Array.isArray(project.technologies) ? project.technologies.join(', ') : 'No se especifican tecnologías'}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+  <h2>Proyectos</h2>
+  <div className="projects-list">
+    {projects.map(project => (
+      <div key={project.id} className="project">
+        <h3><a href={project.html_url} target="_blank" rel="noopener noreferrer">{project.name}</a></h3>
+        <p>{project.description}</p>
+        {project.image && <img src={project.image} alt={project.name} />}
+        <p>Tecnologías utilizadas: {Array.isArray(project.technologies) ? project.technologies.join(', ') : 'No se especifican tecnologías'}</p>
+      </div>
+    ))}
+  </div>
+</section>
 
       <div className="contact-skills-container">
       <section id="contact" className={sections.find(section => section.id === 'contact')?.visible ? 'section-visible' : ''}>
-  <h2>Contacto</h2>
-  {formSubmitted ? (
-    <div className="form-submitted-message">
-    ¡Tu formulario ha sido enviado con éxito!
-    </div>
-  ) : (
-    <form onSubmit={onSubmit}>
-      <label htmlFor="name">Nombre:</label>
-      <input type="text" id="name" name="name" required />
-      <label htmlFor="email">Email:</label>
-      <input type="email" id="email" name="email" required />
-      <label htmlFor="message">Mensaje:</label>
-      <textarea id="message" name="message" required></textarea>
-      <div className="button-container">
-        <button type="submit">Enviar</button>
-      </div>
-    </form>
-  )}
-</section>
+        <h2>Contacto</h2>
+        <ContactForm />
+      </section>
 
   <section id="skills" className={sections.find(section => section.id === 'skills')?.visible ? 'section-visible' : ''}>
     <h2>Habilidades</h2>
