@@ -9,49 +9,55 @@ import 'prismjs/components/prism-javascript';
 import './App.css';
 
 function ContactForm() {
-  const formRef = useRef(); // Crea la referencia
+  const formRef = useRef();
   const [state, handleSubmit] = useForm(process.env.REACT_APP_FORMSPREE_API_KEY);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [formData, setFormData] = useState({ email: '', message: '' });
 
   useEffect(() => {
     if (state.succeeded) {
       setShowSuccessMessage(true);
-      formRef.current.reset(); // Limpia el formulario
-      setTimeout(() => {
+      formRef.current.reset();
+      const timer = setTimeout(() => {
         setShowSuccessMessage(false);
       }, 2000);
+      return () => clearTimeout(timer);
     }
   }, [state.succeeded]);
+
+  const handleChange = e => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleFormSubmit = async e => {
+    e.preventDefault();
+    await handleSubmit(e);
+    setFormData({ email: '', message: '' });
+    setShowSuccessMessage(false); // Aquí lo restablecemos a false al enviar el formulario nuevamente
+  };
 
   return (
     <div>
       {showSuccessMessage && <p>¡Gracias por contactar!</p>}
-      <form ref={formRef} onSubmit={handleSubmit}> {/* Asigna la referencia al formulario */}
-        <label htmlFor="email">
-          Email
-        </label>
+      <form ref={formRef} onSubmit={handleFormSubmit}>
+        <label htmlFor="email">Email</label>
         <input
           id="email"
-          type="email" 
+          type="email"
           name="email"
+          value={formData.email}
+          onChange={handleChange}
         />
-        <ValidationError 
-          prefix="Email" 
-          field="email"
-          errors={state.errors}
-        />
-        <label htmlFor="textarea">
-          Mesnaje
-        </label>
+        <ValidationError prefix="Email" field="email" errors={state.errors} />
+        <label htmlFor="message">Mensaje</label>
         <textarea
           id="message"
           name="message"
+          value={formData.message}
+          onChange={handleChange}
         />
-        <ValidationError 
-          prefix="Mensaje" 
-          field="message"
-          errors={state.errors}
-        />
+        <ValidationError prefix="Mensaje" field="message" errors={state.errors} />
         <button type="submit" disabled={state.submitting}>
           Enviar
         </button>
