@@ -1,26 +1,28 @@
 //App.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // Añade useRef aquí
 import { useForm, ValidationError } from '@formspree/react';
 
 import './App.css';
 
 function ContactForm() {
-  const [state, handleSubmit] = useForm("mleqwnpo");
+  const formRef = useRef(); // Crea la referencia
+  const [state, handleSubmit] = useForm(process.env.REACT_APP_FORMSPREE_API_KEY);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   useEffect(() => {
     if (state.succeeded) {
       setShowSuccessMessage(true);
+      formRef.current.reset(); // Limpia el formulario
       setTimeout(() => {
         setShowSuccessMessage(false);
-      }, 2000); // Desaparece después de 2 segundos
+      }, 2000);
     }
   }, [state.succeeded]);
-  
+
   return (
     <div>
       {showSuccessMessage && <p>¡Gracias por contactar!</p>}
-      <form onSubmit={handleSubmit}>
+      <form ref={formRef} onSubmit={handleSubmit}> {/* Asigna la referencia al formulario */}
         <label htmlFor="email">
           Email
         </label>
