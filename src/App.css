@@ -294,5 +294,15 @@ i {
   }
 }
 
+.blog-post {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.blog-post h3 {
+  cursor: pointer;
+}
+
 
 
